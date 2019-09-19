@@ -21,7 +21,7 @@ func createTopic(brokers string, topic string) error {
 	if err != nil {
 		return err
 	}
-	_, err = admin.CreateTopics(
+	rs, err := admin.CreateTopics(
 		context.Background(),
 		[]kafka.TopicSpecification{
 			kafka.TopicSpecification{
@@ -31,5 +31,10 @@ func createTopic(brokers string, topic string) error {
 			},
 		},
 	)
+	for _, r := range rs {
+		if r.Error.Code() != kafka.ErrNoError {
+			return r.Error
+		}
+	}
 	return err
 }
