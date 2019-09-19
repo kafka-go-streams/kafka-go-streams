@@ -47,9 +47,9 @@ func TestNewTableBase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed: %v", err)
 	}
+	defer tb.Close()
 
 	time.Sleep(2 * time.Second)
 	s := tb.Get([]byte("Key"))
 	assert.Equal(t, "Value", string(s))
-	tb.Close()
 }
