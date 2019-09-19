@@ -11,6 +11,7 @@ import (
 
 func TestNewGlobalTable(t *testing.T) {
 	topic := makeTopic()
+	createTopic("localhost", topic)
 
 	// Produce test message
 	producer, err := kafka.NewProducer(

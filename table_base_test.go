@@ -12,6 +12,7 @@ import (
 
 func TestNewTableBase(t *testing.T) {
 	topic := makeTopic()
+	createTopic("localhost", topic)
 
 	// Produce test message
 	producer, err := kafka.NewProducer(
@@ -29,6 +30,8 @@ func TestNewTableBase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed: %v", err)
 	}
+
+	time.Sleep(2 * time.Second)
 
 	// Start table
 	tb, err := NewTableBase(&TableBaseConfig{

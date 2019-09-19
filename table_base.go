@@ -52,7 +52,7 @@ func NewTableBase(config *TableBaseConfig) (*TableBase, error) {
 		return nil, err
 	}
 
-	err = restoreOffsets(consumer, config.Topic)
+	err = restoreOffsets(db, consumer, config.Topic)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func NewTableBase(config *TableBaseConfig) (*TableBase, error) {
 	return tb, nil
 }
 
-func restoreOffsets(consumer *kafka.Consumer, topic string) error {
+func restoreOffsets(db *rocksdb.DB, consumer *kafka.Consumer, topic string) error {
 	meta, err := consumer.GetMetadata(&topic, false, 1000)
 	if err != nil {
 		return err
@@ -74,10 +74,14 @@ func restoreOffsets(consumer *kafka.Consumer, topic string) error {
 	}
 	assignment := make([]kafka.TopicPartition, len(topicMeta.Partitions))
 	for i, p := range topicMeta.Partitions {
+		offset, err := getOffset(db, p.ID)
+		if err != nil {
+			return err
+		}
 		assignment[i] = kafka.TopicPartition{
 			Topic:     &topic,
 			Partition: p.ID,
-			Offset:    0,
+			Offset:    kafka.Offset(offset),
 		}
 	}
 	err = consumer.Assign(assignment)
@@ -87,10 +91,13 @@ func restoreOffsets(consumer *kafka.Consumer, topic string) error {
 	return nil
 }
 
-func getOffset(db *rocksdb.DB, partition int) (offset int64, err error) {
+func getOffset(db *rocksdb.DB, partition int32) (int64, error) {
 	offsetKey := fmt.Sprintf("partition-offset-%v", partition)
 	opts := rocksdb.NewDefaultReadOptions()
 	slice, _ := db.Get(opts, []byte(offsetKey))
+	if !slice.Exists() {
+		return -1, nil
+	}
 	return strconv.ParseInt(string(slice.Data()), 0, 64)
 
 }
