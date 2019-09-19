@@ -91,10 +91,13 @@ func restoreOffsets(db *rocksdb.DB, consumer *kafka.Consumer, topic string) erro
 	return nil
 }
 
+func partitionKey(partition int32) string {
+	return fmt.Sprintf("partition-offset-%v", partition)
+}
+
 func getOffset(db *rocksdb.DB, partition int32) (int64, error) {
-	offsetKey := fmt.Sprintf("partition-offset-%v", partition)
 	opts := rocksdb.NewDefaultReadOptions()
-	slice, _ := db.Get(opts, []byte(offsetKey))
+	slice, _ := db.Get(opts, []byte(partitionKey(partition)))
 	if !slice.Exists() {
 		return -1, nil
 	}
@@ -118,9 +121,8 @@ loop:
 			}
 		} else {
 			tb.db.Put(opts, []byte(msg.Key), []byte(msg.Value))
-			key := fmt.Sprintf("%v", msg.TopicPartition.Partition)
 			value := fmt.Sprintf("%v", msg.TopicPartition.Offset)
-			tb.db.Put(opts, []byte(key), []byte(value))
+			tb.db.Put(opts, []byte(partitionKey(msg.TopicPartition.Partition)), []byte(value))
 		}
 		time.Sleep(2 * time.Second)
 	}
