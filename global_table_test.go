@@ -2,7 +2,6 @@ package streams
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,7 +9,7 @@ import (
 	kafka "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
-func TestNewTableBase(t *testing.T) {
+func TestNewGlobalTable(t *testing.T) {
 	topic := makeTopic()
 
 	// Produce test message
@@ -31,15 +30,11 @@ func TestNewTableBase(t *testing.T) {
 	}
 
 	// Start table
-	tb, err := NewTableBase(&TableBaseConfig{
+	tb, err := NewGlobalTable(&GlobalTableConfig{
 		StoragePath: "test_database",
 		Brokers:     "localhost",
 		Topic:       topic,
-		Handler: func(p Pair) []Pair {
-			fmt.Printf("%v: %v\n", p.Key, p.Value)
-			return []Pair{p}
-		},
-		Context: context.Background(),
+		Context:     context.Background(),
 	})
 	if err != nil {
 		t.Fatalf("Failed: %v", err)
