@@ -95,6 +95,10 @@ func partitionKey(partition int32) string {
 	return fmt.Sprintf("partition-offset-%v", partition)
 }
 
+func valueKey(s []byte) []byte {
+	return append([]byte("value-"), s...)
+}
+
 func getOffset(db *rocksdb.DB, partition int32) (kafka.Offset, error) {
 	opts := rocksdb.NewDefaultReadOptions()
 	slice, _ := db.Get(opts, []byte(partitionKey(partition)))
@@ -121,7 +125,7 @@ loop:
 				fmt.Printf("Error receiving message: %v\n", err)
 			}
 		} else {
-			tb.db.Put(opts, []byte(msg.Key), []byte(msg.Value))
+			tb.db.Put(opts, valueKey(msg.Key), msg.Value)
 			value := fmt.Sprintf("%v", msg.TopicPartition.Offset)
 			tb.db.Put(opts, []byte(partitionKey(msg.TopicPartition.Partition)), []byte(value))
 		}
@@ -132,7 +136,7 @@ loop:
 
 func (tb *TableBase) Get(key []byte) []byte {
 	opts := rocksdb.NewDefaultReadOptions()
-	slice, _ := tb.db.Get(opts, key)
+	slice, _ := tb.db.Get(opts, valueKey(key))
 	return slice.Data()
 }
 
