@@ -3,9 +3,18 @@ package streams
 import (
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 
 	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
+
+const (
+	changeLogTopicSuffix = "-changelog"
+)
+
+func changelogTopicName(groupId, storageName string) string {
+	return groupId + "-" + storageName + changeLogTopicSuffix
+}
 
 type TableConfig struct {
 	StoragePath string
@@ -13,10 +22,21 @@ type TableConfig struct {
 	GroupId     string
 	Topic       string
 	Context     context.Context
+	Logger      *log.Logger
 }
 
 type Table struct {
 	consumer *k.Consumer
+	config   *TableConfig
+}
+
+type rebalanceListener struct {
+	log *log.Logger
+}
+
+func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
+	l.log.Debugf("Rebalance event: %v\n", e)
+	return nil
 }
 
 func rebalanceCb(c *k.Consumer, e k.Event) error {
@@ -32,10 +52,17 @@ func NewTable(config *TableConfig) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	consumer.Subscribe(config.Topic, rebalanceCb)
+
+	rl := &rebalanceListener{
+		log: config.Logger,
+	}
+	consumer.Subscribe(config.Topic, func(c *k.Consumer, e k.Event) error {
+		return rl.rebalance(c, e)
+	})
 
 	t := &Table{
 		consumer: consumer,
+		config:   config,
 	}
 	go t.run()
 	return t, nil
