@@ -2,7 +2,6 @@ package streams
 
 import (
 	"context"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 
 	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
@@ -35,12 +34,7 @@ type rebalanceListener struct {
 }
 
 func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
-	l.log.Debugf("Rebalance event: %v\n", e)
-	return nil
-}
-
-func rebalanceCb(c *k.Consumer, e k.Event) error {
-	fmt.Printf("Rebalance event: %v\n", e)
+	l.log.Debugf("Rebalance event: %v", e)
 	return nil
 }
 
@@ -68,9 +62,15 @@ func NewTable(config *TableConfig) (*Table, error) {
 	return t, nil
 }
 
+func (t *Table) log(level log.Level, format string, args ...interface{}) {
+	if t.config.Logger != nil {
+		t.config.Logger.Logf(level, format, args...)
+	}
+}
+
 func (t *Table) run() {
 	for {
 		e := t.consumer.Poll(1000)
-		fmt.Printf("Poll event: %v\n", e)
+		t.log(log.DebugLevel, "Poll event: %v\n", e)
 	}
 }
