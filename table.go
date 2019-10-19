@@ -29,6 +29,9 @@ type Table struct {
 	consumer *k.Consumer
 	config   *TableConfig
 	db       *rocksdb.DB
+	ctx      context.Context
+	cancel   context.CancelFunc
+	finished chan struct{}
 }
 
 type rebalanceListener struct {
@@ -66,10 +69,15 @@ func NewTable(config *TableConfig) (*Table, error) {
 		return rl.rebalance(c, e)
 	})
 
+	context, cancelFunc := context.WithCancel(config.Context)
+
 	t := &Table{
 		consumer: consumer,
 		config:   config,
 		db:       db,
+		ctx:      context,
+		cancel:   cancelFunc,
+		finished: make(chan struct{}),
 	}
 	go t.run()
 	return t, nil
@@ -82,8 +90,15 @@ func (t *Table) log(level log.Level, format string, args ...interface{}) {
 }
 
 func (t *Table) run() {
+loop:
 	for {
+		select {
+		case <-t.ctx.Done():
+			break loop
+		default:
+		}
 		e := t.consumer.Poll(1000)
 		t.log(log.DebugLevel, "Poll event: %v\n", e)
 	}
+	close(t.finished)
 }
