@@ -41,6 +41,16 @@ func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 }
 
 func NewTable(config *TableConfig) (*Table, error) {
+	bbto := rocksdb.NewDefaultBlockBasedTableOptions()
+	bbto.SetBlockCache(rocksdb.NewLRUCache(3 << 30))
+	opts := rocksdb.NewDefaultOptions()
+	opts.SetBlockBasedTableFactory(bbto)
+	opts.SetCreateIfMissing(true)
+	db, err := rocksdb.OpenDb(opts, config.StoragePath)
+	if err != nil {
+		return nil, err
+	}
+
 	consumer, err := k.NewConsumer(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
 		"group.id":          config.GroupId,
@@ -59,6 +69,7 @@ func NewTable(config *TableConfig) (*Table, error) {
 	t := &Table{
 		consumer: consumer,
 		config:   config,
+		db:       db,
 	}
 	go t.run()
 	return t, nil
