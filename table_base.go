@@ -8,7 +8,7 @@ import (
 	"time"
 
 	rocksdb "github.com/tecbot/gorocksdb"
-	kafka "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 type TableBaseConfig struct {
@@ -21,7 +21,7 @@ type TableBaseConfig struct {
 
 type TableBase struct {
 	db       *rocksdb.DB
-	consumer *kafka.Consumer
+	consumer *k.Consumer
 	ctx      context.Context
 	cancel   context.CancelFunc
 	finished chan struct{}
@@ -44,7 +44,7 @@ func NewTableBase(config *TableBaseConfig) (*TableBase, error) {
 	if err != nil {
 		return nil, err
 	}
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+	consumer, err := k.NewConsumer(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
 		"group.id":          "Useless empty group",
 	})
@@ -63,7 +63,7 @@ func NewTableBase(config *TableBaseConfig) (*TableBase, error) {
 	return tb, nil
 }
 
-func restoreOffsets(db *rocksdb.DB, consumer *kafka.Consumer, topic string) error {
+func restoreOffsets(db *rocksdb.DB, consumer *k.Consumer, topic string) error {
 	meta, err := consumer.GetMetadata(&topic, false, 1000)
 	if err != nil {
 		return err
@@ -72,16 +72,16 @@ func restoreOffsets(db *rocksdb.DB, consumer *kafka.Consumer, topic string) erro
 	if !ok {
 		return errors.New("Topic is not known to the broker")
 	}
-	assignment := make([]kafka.TopicPartition, len(topicMeta.Partitions))
+	assignment := make([]k.TopicPartition, len(topicMeta.Partitions))
 	for i, p := range topicMeta.Partitions {
 		offset, err := getOffset(db, p.ID)
 		if err != nil {
 			return err
 		}
-		assignment[i] = kafka.TopicPartition{
+		assignment[i] = k.TopicPartition{
 			Topic:     &topic,
 			Partition: p.ID,
-			Offset:    kafka.Offset(offset),
+			Offset:    k.Offset(offset),
 		}
 	}
 	err = consumer.Assign(assignment)
@@ -99,14 +99,14 @@ func valueKey(s []byte) []byte {
 	return append([]byte("value-"), s...)
 }
 
-func getOffset(db *rocksdb.DB, partition int32) (kafka.Offset, error) {
+func getOffset(db *rocksdb.DB, partition int32) (k.Offset, error) {
 	opts := rocksdb.NewDefaultReadOptions()
 	slice, _ := db.Get(opts, []byte(partitionKey(partition)))
 	if !slice.Exists() {
-		return kafka.OffsetBeginning, nil
+		return k.OffsetBeginning, nil
 	}
 	intOffset, err := strconv.ParseInt(string(slice.Data()), 0, 64)
-	return kafka.Offset(intOffset), err
+	return k.Offset(intOffset), err
 
 }
 
@@ -121,7 +121,7 @@ loop:
 		}
 		msg, err := tb.consumer.ReadMessage(5 * time.Second)
 		if err != nil {
-			if err.(kafka.Error).Code() != kafka.ErrTimedOut {
+			if err.(k.Error).Code() != k.ErrTimedOut {
 				fmt.Printf("Error receiving message: %v\n", err)
 			}
 		} else {

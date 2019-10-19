@@ -2,8 +2,9 @@ package streams
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 
+	log "github.com/sirupsen/logrus"
+	rocksdb "github.com/tecbot/gorocksdb"
 	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
@@ -27,6 +28,7 @@ type TableConfig struct {
 type Table struct {
 	consumer *k.Consumer
 	config   *TableConfig
+	db       *rocksdb.DB
 }
 
 type rebalanceListener struct {
