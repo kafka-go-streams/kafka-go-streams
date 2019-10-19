@@ -12,19 +12,21 @@ const (
 	changeLogTopicSuffix = "-changelog"
 )
 
-func changelogTopicName(groupId, storageName string) string {
-	return groupId + "-" + storageName + changeLogTopicSuffix
+func changelogTopicName(groupID, storageName string) string {
+	return groupID + "-" + storageName + changeLogTopicSuffix
 }
 
+// TableConfig is a structure for configuring table.
 type TableConfig struct {
 	StoragePath string
 	Brokers     string
-	GroupId     string
+	GroupID     string
 	Topic       string
 	Context     context.Context
 	Logger      *log.Logger
 }
 
+// Table is a primitive for working with distributed tables.
 type Table struct {
 	consumer *k.Consumer
 	config   *TableConfig
@@ -43,6 +45,7 @@ func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 	return nil
 }
 
+// NewTable constructs a new table.
 func NewTable(config *TableConfig) (*Table, error) {
 	bbto := rocksdb.NewDefaultBlockBasedTableOptions()
 	bbto.SetBlockCache(rocksdb.NewLRUCache(3 << 30))
@@ -56,7 +59,7 @@ func NewTable(config *TableConfig) (*Table, error) {
 
 	consumer, err := k.NewConsumer(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
-		"group.id":          config.GroupId,
+		"group.id":          config.GroupID,
 	})
 	if err != nil {
 		return nil, err

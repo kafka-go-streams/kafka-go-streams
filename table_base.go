@@ -11,6 +11,7 @@ import (
 	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
+// TableBaseConfig comment
 type TableBaseConfig struct {
 	StoragePath string
 	Brokers     string
@@ -19,6 +20,7 @@ type TableBaseConfig struct {
 	Context     context.Context
 }
 
+// TableBase comment
 type TableBase struct {
 	db       *rocksdb.DB
 	consumer *k.Consumer
@@ -27,13 +29,16 @@ type TableBase struct {
 	finished chan struct{}
 }
 
+// Handler comment
 type Handler func(p Pair) []Pair
 
+// Pair comment
 type Pair struct {
 	Key   []byte
 	Value []byte
 }
 
+// NewTableBase comment
 func NewTableBase(config *TableBaseConfig) (*TableBase, error) {
 	bbto := rocksdb.NewDefaultBlockBasedTableOptions()
 	bbto.SetBlockCache(rocksdb.NewLRUCache(3 << 30))
@@ -134,12 +139,14 @@ loop:
 	close(tb.finished)
 }
 
+// Get comment
 func (tb *TableBase) Get(key []byte) []byte {
 	opts := rocksdb.NewDefaultReadOptions()
 	slice, _ := tb.db.Get(opts, valueKey(key))
 	return slice.Data()
 }
 
+// Close is a method of TableBase for closing it.
 func (tb *TableBase) Close() error {
 	tb.cancel()
 	<-tb.finished
