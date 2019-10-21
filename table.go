@@ -2,6 +2,8 @@ package streams
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	rocksdb "github.com/tecbot/gorocksdb"
@@ -115,6 +117,7 @@ func (l *LogWrapper) log(level log.Level, format string, args ...interface{}) {
 }
 
 func (t *Table) run() {
+	opts := rocksdb.NewDefaultWriteOptions()
 loop:
 	for {
 		select {
@@ -125,10 +128,19 @@ loop:
 		e := t.consumer.Poll(1000)
 		switch v := e.(type) {
 		case *k.Message:
+			t.db.Put(opts, valueKey(v.Key), v.Value)
+			value := fmt.Sprintf("%v", v.TopicPartition.Offset)
+			t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
+
 			t.log.log(log.DebugLevel, "It was poll event: %v", v)
+		case *k.Error:
+			if v.Code() != k.ErrTimedOut {
+				fmt.Printf("Error receiving message: %v\n", v)
+			}
 		default:
 			t.log.log(log.DebugLevel, "Unknown event type: %v\n", v)
 		}
+		time.Sleep(2 * time.Second)
 	}
 	close(t.finished)
 }

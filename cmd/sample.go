@@ -10,8 +10,13 @@ import (
 
 func main() {
 
+	logFile, err := os.Create("log.txt")
+	if err != nil {
+		log.Fatalf("Failed to open log file")
+	}
+
 	log := &log.Logger{
-		Out:       os.Stderr,
+		Out:       logFile,
 		Formatter: new(log.JSONFormatter),
 		Hooks:     make(log.LevelHooks),
 		Level:     log.DebugLevel,
