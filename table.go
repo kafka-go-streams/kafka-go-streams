@@ -34,19 +34,30 @@ type Table struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	finished chan struct{}
+	log      *LogWrapper
 }
 
 type rebalanceListener struct {
-	log *log.Logger
+	log *LogWrapper
 }
 
 func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
-	l.log.Debugf("Rebalance event: %v", e)
+	switch v := e.(type) {
+	case k.AssignedPartitions:
+		l.log.log(log.DebugLevel, "It was assigned partitions event: %v", v)
+	case k.RevokedPartitions:
+		l.log.log(log.DebugLevel, "It was revoked partitions event: %v", v)
+	default:
+		l.log.log(log.DebugLevel, "Unknown rebalance event: %v", e)
+	}
 	return nil
 }
 
 // NewTable constructs a new table.
 func NewTable(config *TableConfig) (*Table, error) {
+
+	logWrapper := &LogWrapper{config.Logger}
+
 	bbto := rocksdb.NewDefaultBlockBasedTableOptions()
 	bbto.SetBlockCache(rocksdb.NewLRUCache(3 << 30))
 	opts := rocksdb.NewDefaultOptions()
@@ -66,7 +77,7 @@ func NewTable(config *TableConfig) (*Table, error) {
 	}
 
 	rl := &rebalanceListener{
-		log: config.Logger,
+		log: logWrapper,
 	}
 	consumer.Subscribe(config.Topic, func(c *k.Consumer, e k.Event) error {
 		return rl.rebalance(c, e)
@@ -81,14 +92,25 @@ func NewTable(config *TableConfig) (*Table, error) {
 		ctx:      context,
 		cancel:   cancelFunc,
 		finished: make(chan struct{}),
+		log:      logWrapper,
 	}
 	go t.run()
 	return t, nil
 }
 
-func (t *Table) log(level log.Level, format string, args ...interface{}) {
-	if t.config.Logger != nil {
-		t.config.Logger.Logf(level, format, args...)
+func (t *Table) Get(key []byte) []byte {
+	opts := rocksdb.NewDefaultReadOptions()
+	slice, _ := t.db.Get(opts, valueKey(key))
+	return slice.Data()
+}
+
+type LogWrapper struct {
+	logger *log.Logger
+}
+
+func (l *LogWrapper) log(level log.Level, format string, args ...interface{}) {
+	if l != nil && l.logger != nil {
+		l.logger.Logf(level, format, args...)
 	}
 }
 
@@ -101,7 +123,12 @@ loop:
 		default:
 		}
 		e := t.consumer.Poll(1000)
-		t.log(log.DebugLevel, "Poll event: %v\n", e)
+		switch v := e.(type) {
+		case *k.Message:
+			t.log.log(log.DebugLevel, "It was poll event: %v", v)
+		default:
+			t.log.log(log.DebugLevel, "Unknown event type: %v\n", v)
+		}
 	}
 	close(t.finished)
 }
