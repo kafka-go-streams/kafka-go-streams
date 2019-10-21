@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	streams "github.com/kafka-go-streams/kafka-go-streams"
@@ -34,8 +35,12 @@ func main() {
 		log.Fatalf("Failed to construct table: %v", err)
 	}
 
-	v := table.Get([]byte("key"))
-	log.Infof("%v", v)
+	for {
+		var key string
+		fmt.Scanf("%v", &key)
+		v := table.Get([]byte(key))
+		fmt.Printf("%v\n", string(v))
+	}
 
 	c := make(chan int)
 	<-c

@@ -128,6 +128,7 @@ loop:
 		e := t.consumer.Poll(1000)
 		switch v := e.(type) {
 		case *k.Message:
+			t.log.log(log.DebugLevel, "Storing in the database: %v: %v", string(valueKey(v.Key)), string(v.Value))
 			t.db.Put(opts, valueKey(v.Key), v.Value)
 			value := fmt.Sprintf("%v", v.TopicPartition.Offset)
 			t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
