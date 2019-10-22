@@ -27,11 +27,13 @@ type TableConfig struct {
 	DB          *rocksdb.DB
 	Context     context.Context
 	Logger      *log.Logger
+	Name        string
 }
 
 // Table is a primitive for working with distributed tables.
 type Table struct {
 	consumer *k.Consumer
+	producer *k.Producer
 	config   *TableConfig
 	db       *rocksdb.DB
 	ctx      context.Context
@@ -80,6 +82,7 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		db = config.DB
 	}
 
+	// consumer
 	consumer, err := k.NewConsumer(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
 		"group.id":          config.GroupID,
@@ -95,10 +98,17 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		return rl.rebalance(c, e)
 	})
 
+	// producer
+	producer, err := k.NewProducer(&k.ConfigMap{
+		"bootstrap.servers": config.Brokers,
+	})
+
+	// context
 	context, cancelFunc := context.WithCancel(config.Context)
 
 	t = &Table{
 		consumer: consumer,
+		producer: producer,
 		config:   config,
 		db:       db,
 		ctx:      context,
@@ -139,9 +149,21 @@ loop:
 		switch v := e.(type) {
 		case *k.Message:
 			t.log.log(log.DebugLevel, "Storing in the database: %v: %v", string(valueKey(v.Key)), string(v.Value))
-			t.db.Put(opts, valueKey(v.Key), v.Value)
+			err := t.db.Put(opts, valueKey(v.Key), v.Value)
+			if err != nil {
+				t.log.log(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
+				break loop
+			}
 			value := fmt.Sprintf("%v", v.TopicPartition.Offset)
-			t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
+			err = t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
+			if err != nil {
+				t.log.log(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
+				break loop
+			}
+			_, err = t.consumer.CommitMessage(v)
+			if err != nil {
+				t.log.log(log.WarnLevel, "Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
+			}
 
 			t.log.log(log.DebugLevel, "It was poll event: %v", v)
 		case *k.Error:
