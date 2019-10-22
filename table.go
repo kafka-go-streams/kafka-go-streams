@@ -24,6 +24,7 @@ type TableConfig struct {
 	Brokers     string
 	GroupID     string
 	Topic       string
+	DB          *rocksdb.DB
 	Context     context.Context
 	Logger      *log.Logger
 }
@@ -55,19 +56,28 @@ func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 	return nil
 }
 
-// NewTable constructs a new table.
-func NewTable(config *TableConfig) (*Table, error) {
-
-	logWrapper := &LogWrapper{config.Logger}
-
+func DefaultRocksDB(storagePath string) (*rocksdb.DB, error) {
 	bbto := rocksdb.NewDefaultBlockBasedTableOptions()
 	bbto.SetBlockCache(rocksdb.NewLRUCache(3 << 30))
 	opts := rocksdb.NewDefaultOptions()
 	opts.SetBlockBasedTableFactory(bbto)
 	opts.SetCreateIfMissing(true)
-	db, err := rocksdb.OpenDb(opts, config.StoragePath)
-	if err != nil {
-		return nil, err
+	return rocksdb.OpenDb(opts, storagePath)
+}
+
+// NewTable constructs a new table.
+func NewTable(config *TableConfig) (t *Table, err error) {
+
+	logWrapper := &LogWrapper{config.Logger}
+
+	var db *rocksdb.DB
+	if config.DB == nil {
+		db, err = DefaultRocksDB(config.GroupID + ".db")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		db = config.DB
 	}
 
 	consumer, err := k.NewConsumer(&k.ConfigMap{
@@ -87,7 +97,7 @@ func NewTable(config *TableConfig) (*Table, error) {
 
 	context, cancelFunc := context.WithCancel(config.Context)
 
-	t := &Table{
+	t = &Table{
 		consumer: consumer,
 		config:   config,
 		db:       db,
