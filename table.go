@@ -138,6 +138,7 @@ func (l *LogWrapper) log(level log.Level, format string, args ...interface{}) {
 
 func (t *Table) run() {
 	opts := rocksdb.NewDefaultWriteOptions()
+	changelogTopicName := changelogTopicName(t.config.GroupID, t.config.Name)
 loop:
 	for {
 		select {
@@ -160,6 +161,12 @@ loop:
 				t.log.log(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
 				break loop
 			}
+			deliveryChan := make(chan k.Event)
+			t.producer.Produce(&k.Message{
+				TopicPartition: k.TopicPartition{Topic: &changelogTopicName, Partition: k.PartitionAny},
+				Key:            v.Key,
+				Value:          []byte{},
+			}, deliveryChan)
 			_, err = t.consumer.CommitMessage(v)
 			if err != nil {
 				t.log.log(log.WarnLevel, "Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
