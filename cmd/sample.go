@@ -29,6 +29,7 @@ func main() {
 		Topic:       "test_topic",
 		Context:     context.Background(),
 		Logger:      log,
+		Name:        "test_application",
 	})
 
 	if err != nil {

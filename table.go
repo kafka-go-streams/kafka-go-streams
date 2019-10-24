@@ -116,7 +116,31 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		finished: make(chan struct{}),
 		log:      logWrapper,
 	}
-	go t.run()
+	changelogTopicName := changelogTopicName(t.config.GroupID, t.config.Name)
+	adminClient, err := k.NewAdminClient(&k.ConfigMap{
+		"bootstrap.servers": config.Brokers,
+	})
+	if err != nil {
+		return nil, err
+	}
+	//t.log.log(log.DebugLevel, "Change log topic name: %v", changelogTopicName)
+	metadata, err := adminClient.GetMetadata(&config.Topic, false, 10)
+	if err != nil {
+		return nil, err
+	}
+	originalTopicNumPartitions := len(metadata.Topics[config.Topic].Partitions)
+	originalTopicReplicationFactor := len(metadata.Topics[config.Topic].Partitions[0].Replicas)
+	logWrapper.log(log.DebugLevel, "%v", metadata.Topics)
+	topicSpec := k.TopicSpecification{
+		Topic:             changelogTopicName,
+		NumPartitions:     originalTopicNumPartitions,
+		ReplicationFactor: originalTopicReplicationFactor,
+	}
+	_, err = adminClient.CreateTopics(config.Context, []k.TopicSpecification{topicSpec})
+	if err != nil {
+		return nil, err
+	}
+	go t.run(changelogTopicName)
 	return t, nil
 }
 
@@ -136,9 +160,8 @@ func (l *LogWrapper) log(level log.Level, format string, args ...interface{}) {
 	}
 }
 
-func (t *Table) run() {
+func (t *Table) run(changelogTopicName string) {
 	opts := rocksdb.NewDefaultWriteOptions()
-	changelogTopicName := changelogTopicName(t.config.GroupID, t.config.Name)
 loop:
 	for {
 		select {
