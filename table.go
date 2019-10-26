@@ -49,11 +49,11 @@ type rebalanceListener struct {
 func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
-		l.log.log(log.DebugLevel, "It was assigned partitions event: %v", v)
+		l.log.Logf(log.DebugLevel, "It was assigned partitions event: %v", v)
 	case k.RevokedPartitions:
-		l.log.log(log.DebugLevel, "It was revoked partitions event: %v", v)
+		l.log.Logf(log.DebugLevel, "It was revoked partitions event: %v", v)
 	default:
-		l.log.log(log.DebugLevel, "Unknown rebalance event: %v", e)
+		l.log.Logf(log.DebugLevel, "Unknown rebalance event: %v", e)
 	}
 	return nil
 }
@@ -130,7 +130,7 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 	}
 	originalTopicNumPartitions := len(metadata.Topics[config.Topic].Partitions)
 	originalTopicReplicationFactor := len(metadata.Topics[config.Topic].Partitions[0].Replicas)
-	logWrapper.log(log.DebugLevel, "%v", metadata.Topics)
+	logWrapper.Logf(log.DebugLevel, "%v", metadata.Topics)
 	topicSpec := k.TopicSpecification{
 		Topic:             changelogTopicName,
 		NumPartitions:     originalTopicNumPartitions,
@@ -162,16 +162,16 @@ loop:
 		e := t.consumer.Poll(1000)
 		switch v := e.(type) {
 		case *k.Message:
-			t.log.log(log.DebugLevel, "Storing in the database: %v: %v", string(valueKey(v.Key)), string(v.Value))
+			t.log.Logf(log.DebugLevel, "Storing in the database: %v: %v", string(valueKey(v.Key)), string(v.Value))
 			err := t.db.Put(opts, valueKey(v.Key), v.Value)
 			if err != nil {
-				t.log.log(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
+				t.log.Logf(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
 				break loop
 			}
 			value := fmt.Sprintf("%v", v.TopicPartition.Offset)
 			err = t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
 			if err != nil {
-				t.log.log(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
+				t.log.Logf(log.ErrorLevel, "Failed to store key value in the store. Aborting consumer loop.")
 				break loop
 			}
 			deliveryChan := make(chan k.Event)
@@ -182,16 +182,16 @@ loop:
 			}, deliveryChan)
 			_, err = t.consumer.CommitMessage(v)
 			if err != nil {
-				t.log.log(log.WarnLevel, "Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
+				t.log.Logf(log.WarnLevel, "Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
 			}
 
-			t.log.log(log.DebugLevel, "It was poll event: %v", v)
+			t.log.Logf(log.DebugLevel, "It was poll event: %v", v)
 		case *k.Error:
 			if v.Code() != k.ErrTimedOut {
 				fmt.Printf("Error receiving message: %v\n", v)
 			}
 		default:
-			t.log.log(log.DebugLevel, "Unknown event type: %v\n", v)
+			t.log.Logf(log.DebugLevel, "Unknown event type: %v\n", v)
 		}
 		time.Sleep(2 * time.Second)
 	}
