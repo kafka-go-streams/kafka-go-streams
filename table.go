@@ -150,16 +150,6 @@ func (t *Table) Get(key []byte) []byte {
 	return slice.Data()
 }
 
-type LogWrapper struct {
-	logger *log.Logger
-}
-
-func (l *LogWrapper) log(level log.Level, format string, args ...interface{}) {
-	if l != nil && l.logger != nil {
-		l.logger.Logf(level, format, args...)
-	}
-}
-
 func (t *Table) run(changelogTopicName string) {
 	opts := rocksdb.NewDefaultWriteOptions()
 loop:
