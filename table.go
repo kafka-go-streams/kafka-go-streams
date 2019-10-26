@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	changeLogTopicSuffix = "-changelog"
+	changelogTopicSuffix = "-changelog"
 )
 
 func changelogTopicName(groupID, storageName string) string {
-	return groupID + "-" + storageName + changeLogTopicSuffix
+	return groupID + "-" + storageName + changelogTopicSuffix
 }
 
 // TableConfig is a structure for configuring table.
