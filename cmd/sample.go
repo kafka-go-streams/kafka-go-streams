@@ -25,7 +25,7 @@ func main() {
 	table, err := streams.NewTable(&streams.TableConfig{
 		StoragePath: "table.db",
 		Brokers:     "localhost:9092",
-		GroupID:     "my_test_group",
+		GroupID:     "my_test_group1",
 		Topic:       "test_topic",
 		Context:     context.Background(),
 		Logger:      log,

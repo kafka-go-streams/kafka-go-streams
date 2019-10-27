@@ -14,10 +14,6 @@ func (l *LogWrapper) Logf(level log.Level, format string, args ...interface{}) {
 	}
 }
 
-func (l *LogWrapper) Debugf(format string, args ...interface{}) {
-	l.Logf(log.DebugLevel, format, args...)
-}
-
 func (l *LogWrapper) Errorf(format string, args ...interface{}) {
 	l.Logf(log.ErrorLevel, format, args...)
 }
@@ -25,7 +21,14 @@ func (l *LogWrapper) Errorf(format string, args ...interface{}) {
 func (l *LogWrapper) Warnf(format string, args ...interface{}) {
 	l.Logf(log.WarnLevel, format, args...)
 }
-
 func (l *LogWrapper) Infof(format string, args ...interface{}) {
 	l.Logf(log.InfoLevel, format, args...)
+}
+
+func (l *LogWrapper) Debugf(format string, args ...interface{}) {
+	l.Logf(log.DebugLevel, format, args...)
+}
+
+func (l *LogWrapper) Tracef(format string, args ...interface{}) {
+	l.Logf(log.TraceLevel, format, args...)
 }

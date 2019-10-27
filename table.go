@@ -116,6 +116,8 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		finished: make(chan struct{}),
 		log:      logWrapper,
 	}
+
+	// Crate changelog topic
 	changelogTopicName := changelogTopicName(t.config.GroupID, t.config.Name)
 	adminClient, err := k.NewAdminClient(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
@@ -123,7 +125,7 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 	if err != nil {
 		return nil, err
 	}
-	//t.log.log(log.DebugLevel, "Change log topic name: %v", changelogTopicName)
+	t.log.Tracef("Change log topic name: %v", changelogTopicName)
 	metadata, err := adminClient.GetMetadata(&config.Topic, false, 10)
 	if err != nil {
 		return nil, err
@@ -135,6 +137,7 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		Topic:             changelogTopicName,
 		NumPartitions:     originalTopicNumPartitions,
 		ReplicationFactor: originalTopicReplicationFactor,
+		Config:            map[string]string{"cleanup.policy": "compact"},
 	}
 	_, err = adminClient.CreateTopics(config.Context, []k.TopicSpecification{topicSpec})
 	if err != nil {
