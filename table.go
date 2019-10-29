@@ -43,13 +43,21 @@ type Table struct {
 }
 
 type rebalanceListener struct {
-	log *LogWrapper
+	changelogTopicName string
+	log                *LogWrapper
 }
 
 func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
-		l.log.Debugf("It was assigned partitions event: %v", v)
+		l.log.Debugf("Recovering the partition from assignment: %v", v)
+		for _, p := range v.Partitions {
+			if *p.Topic == l.changelogTopicName {
+				p.Offset = k.OffsetBeginning
+				l.log.Debugf("Resetting partition: %v", p)
+				c.Seek(p, 10000)
+			}
+		}
 	case k.RevokedPartitions:
 		l.log.Debugf("It was revoked partitions event: %v", v)
 	default:
@@ -84,19 +92,13 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 
 	// consumer
 	consumer, err := k.NewConsumer(&k.ConfigMap{
-		"bootstrap.servers": config.Brokers,
-		"group.id":          config.GroupID,
+		"bootstrap.servers":  config.Brokers,
+		"group.id":           config.GroupID,
+		"enable.auto.commit": false,
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	rl := &rebalanceListener{
-		log: logWrapper,
-	}
-	consumer.Subscribe(config.Topic, func(c *k.Consumer, e k.Event) error {
-		return rl.rebalance(c, e)
-	})
 
 	// producer
 	producer, err := k.NewProducer(&k.ConfigMap{
@@ -143,6 +145,14 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	rl := &rebalanceListener{
+		changelogTopicName: changelogTopicName,
+		log:                logWrapper,
+	}
+	consumer.SubscribeTopics([]string{config.Topic, changelogTopicName}, func(c *k.Consumer, e k.Event) error {
+		return rl.rebalance(c, e)
+	})
 	go t.run(changelogTopicName)
 	return t, nil
 }
@@ -166,26 +176,30 @@ loop:
 		switch v := e.(type) {
 		case *k.Message:
 			t.log.Debugf("Storing in the database: %v: %v", string(valueKey(v.Key)), string(v.Value))
-			err := t.db.Put(opts, valueKey(v.Key), v.Value)
-			if err != nil {
-				t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
-				break loop
-			}
-			value := fmt.Sprintf("%v", v.TopicPartition.Offset)
-			err = t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
-			if err != nil {
-				t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
-				break loop
-			}
-			deliveryChan := make(chan k.Event)
-			t.producer.Produce(&k.Message{
-				TopicPartition: k.TopicPartition{Topic: &changelogTopicName, Partition: k.PartitionAny},
-				Key:            v.Key,
-				Value:          []byte{},
-			}, deliveryChan)
-			_, err = t.consumer.CommitMessage(v)
-			if err != nil {
-				t.log.Warnf("Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
+			if *v.TopicPartition.Topic == changelogTopicName {
+				err := t.db.Put(opts, valueKey(v.Key), v.Value)
+				if err != nil {
+					t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
+					break loop
+				}
+			} else {
+				t.log.Debugf("Handling non changelog entry")
+				value := fmt.Sprintf("%v", v.TopicPartition.Offset)
+				err := t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
+				if err != nil {
+					t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
+					break loop
+				}
+				deliveryChan := make(chan k.Event)
+				t.producer.Produce(&k.Message{
+					TopicPartition: k.TopicPartition{Topic: &changelogTopicName, Partition: k.PartitionAny},
+					Key:            v.Key,
+					Value:          v.Value,
+				}, deliveryChan)
+				_, err = t.consumer.CommitMessage(v)
+				if err != nil {
+					t.log.Warnf("Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
+				}
 			}
 
 			t.log.Debugf("It was poll event: %v", v)

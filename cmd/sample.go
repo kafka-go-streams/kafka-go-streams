@@ -18,7 +18,7 @@ func main() {
 
 	log := &log.Logger{
 		Out:       logFile,
-		Formatter: new(log.JSONFormatter),
+		Formatter: &log.TextFormatter{},
 		Hooks:     make(log.LevelHooks),
 		Level:     log.DebugLevel,
 	}
