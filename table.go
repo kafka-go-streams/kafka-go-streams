@@ -3,7 +3,6 @@ package streams
 import (
 	"context"
 	"fmt"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	rocksdb "github.com/tecbot/gorocksdb"
@@ -195,7 +194,7 @@ loop:
 			break loop
 		default:
 		}
-		e := t.consumer.Poll(1000)
+		e := t.consumer.Poll(2000)
 		switch v := e.(type) {
 		case *k.Message:
 			t.log.Debugf("Passing to change log")
@@ -228,7 +227,6 @@ loop:
 		default:
 			t.log.Debugf("Unknown event type: %v\n", v)
 		}
-		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -241,7 +239,7 @@ loop:
 			break loop
 		default:
 		}
-		e := t.changelogConsumer.Poll(1000)
+		e := t.changelogConsumer.Poll(2000)
 		switch v := e.(type) {
 		case *k.Message:
 			t.log.Debugf("Handling message: %v: %v", string(valueKey(v.Key)), string(v.Value))
@@ -260,7 +258,6 @@ loop:
 		default:
 			t.log.Debugf("Unknown event type: %v\n", v)
 		}
-		time.Sleep(2 * time.Second)
 	}
 	close(t.finished)
 }
