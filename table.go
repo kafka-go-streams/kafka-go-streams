@@ -32,14 +32,15 @@ type TableConfig struct {
 
 // Table is a primitive for working with distributed tables.
 type Table struct {
-	consumer *k.Consumer
-	producer *k.Producer
-	config   *TableConfig
-	db       *rocksdb.DB
-	ctx      context.Context
-	cancel   context.CancelFunc
-	finished chan struct{}
-	log      *LogWrapper
+	consumer          *k.Consumer
+	changelogConsumer *k.Consumer
+	producer          *k.Producer
+	config            *TableConfig
+	db                *rocksdb.DB
+	ctx               context.Context
+	cancel            context.CancelFunc
+	finished          chan struct{}
+	log               *LogWrapper
 }
 
 type rebalanceListener struct {
@@ -55,7 +56,10 @@ func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 			if *p.Topic == l.changelogTopicName {
 				p.Offset = k.OffsetBeginning
 				l.log.Debugf("Resetting partition: %v", p)
-				c.Seek(p, 10000)
+				err := c.Seek(p, 100)
+				if err != nil {
+					l.log.Errorf("Seek failed: %v", err)
+				}
 			}
 		}
 	case k.RevokedPartitions:
@@ -108,26 +112,15 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 	// context
 	context, cancelFunc := context.WithCancel(config.Context)
 
-	t = &Table{
-		consumer: consumer,
-		producer: producer,
-		config:   config,
-		db:       db,
-		ctx:      context,
-		cancel:   cancelFunc,
-		finished: make(chan struct{}),
-		log:      logWrapper,
-	}
-
 	// Crate changelog topic
-	changelogTopicName := changelogTopicName(t.config.GroupID, t.config.Name)
+	changelogTopicName := changelogTopicName(config.GroupID, config.Name)
 	adminClient, err := k.NewAdminClient(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
 	})
 	if err != nil {
 		return nil, err
 	}
-	t.log.Tracef("Change log topic name: %v", changelogTopicName)
+	logWrapper.Tracef("Change log topic name: %v", changelogTopicName)
 	metadata, err := adminClient.GetMetadata(&config.Topic, false, 10)
 	if err != nil {
 		return nil, err
@@ -153,6 +146,18 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 	consumer.SubscribeTopics([]string{config.Topic, changelogTopicName}, func(c *k.Consumer, e k.Event) error {
 		return rl.rebalance(c, e)
 	})
+
+	t = &Table{
+		consumer: consumer,
+		producer: producer,
+		config:   config,
+		db:       db,
+		ctx:      context,
+		cancel:   cancelFunc,
+		finished: make(chan struct{}),
+		log:      logWrapper,
+	}
+
 	go t.run(changelogTopicName)
 	return t, nil
 }
@@ -175,15 +180,16 @@ loop:
 		e := t.consumer.Poll(1000)
 		switch v := e.(type) {
 		case *k.Message:
-			t.log.Debugf("Storing in the database: %v: %v", string(valueKey(v.Key)), string(v.Value))
+			t.log.Debugf("Handling message: %v: %v", string(valueKey(v.Key)), string(v.Value))
 			if *v.TopicPartition.Topic == changelogTopicName {
+				t.log.Debugf("Passing to change log")
 				err := t.db.Put(opts, valueKey(v.Key), v.Value)
 				if err != nil {
 					t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
 					break loop
 				}
 			} else {
-				t.log.Debugf("Handling non changelog entry")
+				t.log.Debugf("Processing non changelog entry")
 				value := fmt.Sprintf("%v", v.TopicPartition.Offset)
 				err := t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
 				if err != nil {
