@@ -32,19 +32,21 @@ type TableConfig struct {
 
 // Table is a primitive for working with distributed tables.
 type Table struct {
-	consumer          *k.Consumer
-	changelogConsumer *k.Consumer
-	producer          *k.Producer
-	config            *TableConfig
-	db                *rocksdb.DB
-	ctx               context.Context
-	cancel            context.CancelFunc
-	finished          chan struct{}
-	log               *LogWrapper
+	consumer           *k.Consumer
+	changelogConsumer  *k.Consumer
+	producer           *k.Producer
+	config             *TableConfig
+	db                 *rocksdb.DB
+	ctx                context.Context
+	cancel             context.CancelFunc
+	finished           chan struct{}
+	log                *LogWrapper
+	changelogTopicName string
 }
 
 type rebalanceListener struct {
 	changelogTopicName string
+	changelogConsumer  *k.Consumer
 	log                *LogWrapper
 }
 
@@ -52,16 +54,15 @@ func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
 		l.log.Debugf("Recovering the partition from assignment: %v", v)
-		for _, p := range v.Partitions {
-			if *p.Topic == l.changelogTopicName {
-				p.Offset = k.OffsetBeginning
-				l.log.Debugf("Resetting partition: %v", p)
-				err := c.Seek(p, 100)
-				if err != nil {
-					l.log.Errorf("Seek failed: %v", err)
-				}
-			}
+		for i := 0; i < len(v.Partitions); i++ {
+			v.Partitions[i].Topic = &l.changelogTopicName
+			v.Partitions[i].Offset = k.OffsetBeginning
 		}
+		err := l.changelogConsumer.Assign(v.Partitions)
+		if err != nil {
+			l.log.Errorf("Failed to assign changelog partitions: %v", err)
+		}
+		l.log.Debugf("Successfully assigned partitions to changelog reader.")
 	case k.RevokedPartitions:
 		l.log.Debugf("It was revoked partitions event: %v", v)
 	default:
@@ -139,26 +140,44 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		return nil, err
 	}
 
+	// Changelog consumer
+
+	changelogConsumer, err := k.NewConsumer(&k.ConfigMap{
+		"bootstrap.servers":  config.Brokers,
+		"group.id":           config.GroupID,
+		"enable.auto.commit": false,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Subscribe to the main topic
 	rl := &rebalanceListener{
 		changelogTopicName: changelogTopicName,
+		changelogConsumer:  changelogConsumer,
 		log:                logWrapper,
 	}
-	consumer.SubscribeTopics([]string{config.Topic, changelogTopicName}, func(c *k.Consumer, e k.Event) error {
+
+	consumer.Subscribe(config.Topic, func(c *k.Consumer, e k.Event) error {
 		return rl.rebalance(c, e)
 	})
 
+	// Construct table
 	t = &Table{
-		consumer: consumer,
-		producer: producer,
-		config:   config,
-		db:       db,
-		ctx:      context,
-		cancel:   cancelFunc,
-		finished: make(chan struct{}),
-		log:      logWrapper,
+		consumer:           consumer,
+		changelogConsumer:  changelogConsumer,
+		producer:           producer,
+		config:             config,
+		db:                 db,
+		ctx:                context,
+		cancel:             cancelFunc,
+		finished:           make(chan struct{}),
+		log:                logWrapper,
+		changelogTopicName: changelogTopicName,
 	}
 
-	go t.run(changelogTopicName)
+	go t.consumeTopic()
+	go t.consumeChangelog()
 	return t, nil
 }
 
@@ -168,8 +187,7 @@ func (t *Table) Get(key []byte) []byte {
 	return slice.Data()
 }
 
-func (t *Table) run(changelogTopicName string) {
-	opts := rocksdb.NewDefaultWriteOptions()
+func (t *Table) consumeTopic() {
 loop:
 	for {
 		select {
@@ -180,32 +198,48 @@ loop:
 		e := t.consumer.Poll(1000)
 		switch v := e.(type) {
 		case *k.Message:
+			t.log.Debugf("Passing to change log")
+
+			deliveryChan := make(chan k.Event)
+			t.producer.Produce(&k.Message{
+				TopicPartition: k.TopicPartition{Topic: &t.changelogTopicName, Partition: v.TopicPartition.Partition},
+				Key:            v.Key,
+				Value:          v.Value,
+			}, deliveryChan)
+			// TODO check for delivery
+			_, err := t.consumer.CommitMessage(v)
+			if err != nil {
+				t.log.Warnf("Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
+			}
+		case *k.Error:
+			if v.Code() != k.ErrTimedOut {
+				fmt.Printf("Error receiving message: %v\n", v)
+			}
+		default:
+			t.log.Debugf("Unknown event type: %v\n", v)
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func (t *Table) consumeChangelog() {
+	opts := rocksdb.NewDefaultWriteOptions()
+loop:
+	for {
+		select {
+		case <-t.ctx.Done():
+			break loop
+		default:
+		}
+		e := t.changelogConsumer.Poll(1000)
+		switch v := e.(type) {
+		case *k.Message:
 			t.log.Debugf("Handling message: %v: %v", string(valueKey(v.Key)), string(v.Value))
-			if *v.TopicPartition.Topic == changelogTopicName {
-				t.log.Debugf("Passing to change log")
-				err := t.db.Put(opts, valueKey(v.Key), v.Value)
-				if err != nil {
-					t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
-					break loop
-				}
-			} else {
-				t.log.Debugf("Processing non changelog entry")
-				value := fmt.Sprintf("%v", v.TopicPartition.Offset)
-				err := t.db.Put(opts, []byte(partitionKey(v.TopicPartition.Partition)), []byte(value))
-				if err != nil {
-					t.log.Errorf("Failed to store key value in the store. Aborting consumer loop.")
-					break loop
-				}
-				deliveryChan := make(chan k.Event)
-				t.producer.Produce(&k.Message{
-					TopicPartition: k.TopicPartition{Topic: &changelogTopicName, Partition: k.PartitionAny},
-					Key:            v.Key,
-					Value:          v.Value,
-				}, deliveryChan)
-				_, err = t.consumer.CommitMessage(v)
-				if err != nil {
-					t.log.Warnf("Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
-				}
+
+			err := t.db.Put(opts, valueKey(v.Key), v.Value)
+			if err != nil {
+				t.log.Errorf("Failed to store message in the local store")
+				break loop
 			}
 
 			t.log.Debugf("It was poll event: %v", v)
