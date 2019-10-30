@@ -206,14 +206,24 @@ loop:
 				Key:            v.Key,
 				Value:          v.Value,
 			}, deliveryChan)
-			// TODO check for delivery
+
+			de := <-deliveryChan
+			switch dev := de.(type) {
+			case *k.Message:
+				t.log.Debugf("Delivery channel message: %v", dev)
+			case *k.Error:
+				t.log.Errorf("Delivery channel error: %v", dev)
+			default:
+				t.log.Warnf("Unknown reply from delivery: %v", dev)
+			}
+
 			_, err := t.consumer.CommitMessage(v)
 			if err != nil {
 				t.log.Warnf("Failed to commit offset. Continuing consumer loop in hope to commit offset on the next iteration.")
 			}
 		case *k.Error:
 			if v.Code() != k.ErrTimedOut {
-				fmt.Printf("Error receiving message: %v\n", v)
+				t.log.Errorf("Error receiving message: %v\n", v)
 			}
 		default:
 			t.log.Debugf("Unknown event type: %v\n", v)
