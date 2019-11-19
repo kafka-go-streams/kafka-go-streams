@@ -19,14 +19,13 @@ func changelogTopicName(groupID, storageName string) string {
 
 // TableConfig is a structure for configuring table.
 type TableConfig struct {
-	StoragePath string
-	Brokers     string
-	GroupID     string
-	Topic       string
-	DB          *rocksdb.DB
-	Context     context.Context
-	Logger      *log.Logger
-	Name        string
+	Brokers string
+	GroupID string
+	Topic   string
+	DB      *rocksdb.DB
+	Context context.Context
+	Logger  *log.Logger
+	Name    string
 }
 
 // Table is a primitive for working with distributed tables.
@@ -86,12 +85,7 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 
 	var db *rocksdb.DB
 	if config.DB == nil {
-		db, err = DefaultRocksDB(config.GroupID + ".db")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		db = config.DB
+		return nil, fmt.Errorf("Rocks db is expected. Use DefaultRocksDB function to construct default value.")
 	}
 
 	// consumer

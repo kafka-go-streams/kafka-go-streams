@@ -16,13 +16,17 @@ func TestNewTable(t *testing.T) {
 		Hooks:     make(log.LevelHooks),
 		Level:     log.DebugLevel,
 	}
+	defaultRocksDB, err := DefaultRocksDB("my_table_test.db")
+	if err != nil {
+		t.Fatalf("Failed to construct rocksdb: %v", err)
+	}
 	table, err := NewTable(&TableConfig{
-		StoragePath: "table.db",
-		Brokers:     "localhost:9092",
-		GroupID:     "my_test_group",
-		Topic:       "test_topic",
-		Context:     context.Background(),
-		Logger:      log,
+		Brokers: "localhost:9092",
+		GroupID: "my_test_group",
+		DB:      defaultRocksDB,
+		Topic:   "test_topic",
+		Context: context.Background(),
+		Logger:  log,
 	})
 
 	c := make(chan int)
