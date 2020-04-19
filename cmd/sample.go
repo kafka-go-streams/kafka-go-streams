@@ -23,13 +23,13 @@ func main() {
 		Level:     log.DebugLevel,
 	}
 	table, err := streams.NewTable(&streams.TableConfig{
-		StoragePath: "table.db",
-		Brokers:     "localhost:9092",
-		GroupID:     "my_test_group1",
-		Topic:       "test_topic",
-		Context:     context.Background(),
-		Logger:      log,
-		Name:        "test_application",
+		DB:      DefaultRocksDB("table.db"),
+		Brokers: "localhost:9092",
+		GroupID: "my_test_group1",
+		Topic:   "test_topic",
+		Context: context.Background(),
+		Logger:  log,
+		Name:    "test_application",
 	})
 
 	if err != nil {

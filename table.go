@@ -83,10 +83,10 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 
 	logWrapper := &LogWrapper{config.Logger}
 
-	var db *rocksdb.DB
 	if config.DB == nil {
 		return nil, fmt.Errorf("Rocks db is expected. Use DefaultRocksDB function to construct default value.")
 	}
+	db := config.DB
 
 	// consumer
 	consumer, err := k.NewConsumer(&k.ConfigMap{
@@ -175,8 +175,8 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 }
 
 func (t *Table) Get(key []byte) []byte {
-	opts := rocksdb.NewDefaultReadOptions()
-	slice, _ := t.db.Get(opts, valueKey(key))
+	opts := rocksdb.NewDefaultReadOptions()   // TODO destroy read values
+	slice, _ := t.db.Get(opts, valueKey(key)) // TODO destroy slice
 	return slice.Data()
 }
 
@@ -226,6 +226,7 @@ loop:
 
 func (t *Table) consumeChangelog() {
 	opts := rocksdb.NewDefaultWriteOptions()
+	defer opts.Destroy()
 loop:
 	for {
 		select {
@@ -236,9 +237,11 @@ loop:
 		e := t.changelogConsumer.Poll(2000)
 		switch v := e.(type) {
 		case *k.Message:
-			t.log.Debugf("Handling message: %v: %v", string(valueKey(v.Key)), string(v.Value))
+			key := valueKey(v.Key)
+			val := v.Value
+			t.log.Tracef("Handling message: %v: %v", string(key), string(val))
 
-			err := t.db.Put(opts, valueKey(v.Key), v.Value)
+			err := t.db.Put(opts, key, val)
 			if err != nil {
 				t.log.Errorf("Failed to store message in the local store")
 				break loop
