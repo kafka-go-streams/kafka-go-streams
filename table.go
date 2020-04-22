@@ -175,7 +175,8 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 }
 
 func (t *Table) Get(key []byte) []byte {
-	opts := rocksdb.NewDefaultReadOptions()   // TODO destroy read values
+	opts := rocksdb.NewDefaultReadOptions()
+	defer opts.Destroy()
 	slice, _ := t.db.Get(opts, valueKey(key)) // TODO destroy slice
 	return slice.Data()
 }
