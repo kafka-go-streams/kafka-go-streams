@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	kafka "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	kafka "github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 func makeTopic() string {

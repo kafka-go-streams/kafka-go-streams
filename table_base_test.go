@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	kafka "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/stretchr/testify/assert"
-	kafka "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 func TestNewTableBase(t *testing.T) {

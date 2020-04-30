@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	k "github.com/confluentinc/confluent-kafka-go/kafka"
 	log "github.com/sirupsen/logrus"
 	rocksdb "github.com/tecbot/gorocksdb"
-	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 const (
@@ -88,16 +88,6 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 	}
 	db := config.DB
 
-	// consumer
-	consumer, err := k.NewConsumer(&k.ConfigMap{
-		"bootstrap.servers":  config.Brokers,
-		"group.id":           config.GroupID,
-		"enable.auto.commit": false,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	// producer
 	producer, err := k.NewProducer(&k.ConfigMap{
 		"bootstrap.servers": config.Brokers,
@@ -129,6 +119,16 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		Config:            map[string]string{"cleanup.policy": "compact"},
 	}
 	_, err = adminClient.CreateTopics(config.Context, []k.TopicSpecification{topicSpec})
+	if err != nil {
+		return nil, err
+	}
+
+	// consumer
+	consumer, err := k.NewConsumer(&k.ConfigMap{
+		"bootstrap.servers":  config.Brokers,
+		"group.id":           config.GroupID,
+		"enable.auto.commit": false,
+	})
 	if err != nil {
 		return nil, err
 	}
