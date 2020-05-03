@@ -52,9 +52,11 @@ func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
 		l.log.Debugf("Recovering the partition from assignment: %v", v)
 		for i := 0; i < len(v.Partitions); i++ {
 			if *v.Partitions[i].Topic == l.changelogTopicName {
+				l.log.Debugf("Setting offset to beginning")
 				v.Partitions[i].Offset = k.OffsetBeginning
 			}
 		}
+		l.log.Debugf("Set offsets to new values: %v", v.Partitions)
 		err := c.Assign(v.Partitions)
 		if err != nil {
 			l.log.Errorf("Failed to assign changelog partitions: %v", err)
