@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	k "github.com/confluentinc/confluent-kafka-go/kafka"
 	rocksdb "github.com/tecbot/gorocksdb"
-	k "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 // TableBaseConfig comment
