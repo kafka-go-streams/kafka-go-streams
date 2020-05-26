@@ -48,7 +48,7 @@ func (c *RoutingConsumer) Subscribe(topics []string, rebalanceListener Rebalance
 			return nil, fmt.Errorf("Already subscribed to topic: %s.", t)
 		}
 	}
-	sub := &Subscription{make(chan k.Event)}
+	sub := &Subscription{make(chan k.Event), rebalanceListener}
 	for _, t := range topics {
 		c.currentTopics[t] = sub
 	}
@@ -68,13 +68,21 @@ func (c *RoutingConsumer) Subscribe(topics []string, rebalanceListener Rebalance
 func (c *RoutingConsumer) rebalance(kc *k.Consumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
+		topics := make(map[string][]k.TopicPartition)
+		for _, p := range v.Partitions {
+			topics[*p.Topic] = append(topics[*p.Topic], p)
+		}
+		for t, p := range topics {
+			c.currentTopics[t].rebalanceListener(c, k.AssignedPartitions{p})
+		}
 		log.Printf("Received partitions in routing consumer: %v", v)
 	}
 	return nil
 }
 
 type Subscription struct {
-	c chan k.Event
+	c                 chan k.Event
+	rebalanceListener RebalanceListener
 }
 
 func (s *Subscription) Poll() k.Event {
