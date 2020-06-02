@@ -34,6 +34,10 @@ func TestRoutingConsumer(t *testing.T) {
 		switch v := e.(type) {
 		case *k.Message:
 			log.Printf("Key: %s, Value: %s", v.Key, v.Value)
+			_, err := consumer.CommitMessage(v)
+			if err != nil {
+				log.Printf("Failed to commit message offset: %v", err)
+			}
 		case *k.Error:
 			if v.Code() != k.ErrTimedOut {
 				log.Printf("Error receiving message: %v\n", v)
