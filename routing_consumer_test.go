@@ -17,6 +17,7 @@ func TestRoutingConsumer(t *testing.T) {
 		"bootstrap.servers":  "localhost:9092",
 		"group.id":           "rebalance_test_group_id",
 		"enable.auto.commit": false,
+		"auto.offset.reset":  "beginning",
 	})
 	if err != nil {
 		t.Errorf("Failed to construct consumer: %v", err)

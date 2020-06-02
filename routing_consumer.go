@@ -65,6 +65,29 @@ func (c *RoutingConsumer) Subscribe(topics []string, rebalanceListener Rebalance
 	return sub, nil
 }
 
+func (c *RoutingConsumer) ResetOffsets(offsets []Offset) error {
+	offsetMap := make(map[string]int64)
+	for _, o := range offsets {
+		offsetMap[o.Topic] = o.Offset
+	}
+
+	ps, err := c.consumer.Assignment()
+	if err != nil {
+		return err
+	}
+	for i := 0; i < len(ps); i++ {
+		if newOffset, ok := offsetMap[*ps[i].Topic]; ok {
+			ps[i].Offset = k.Offset(newOffset)
+		}
+	}
+	return c.consumer.Assign(ps)
+}
+
+type Offset struct {
+	Offset int64
+	Topic  string
+}
+
 func (c *RoutingConsumer) rebalance(kc *k.Consumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
