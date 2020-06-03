@@ -7,13 +7,14 @@ import (
 	k "github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-// RoutingConsumer allows you to have several processors that consume from different topics,
-// but use the feature of copartitioning topics.
+// RoutingConsumer allows you to have several processors that consume from
+// different topics, but use the feature of copartitioning topics.
 type RoutingConsumer struct {
 	consumer      *k.Consumer
 	currentTopics map[string]*Subscription
 }
 
+// NewRoutingConsumer accepts kafka consumer as a configuration option.
 func NewRoutingConsumer(consumer *k.Consumer) *RoutingConsumer {
 	c := &RoutingConsumer{
 		consumer,
