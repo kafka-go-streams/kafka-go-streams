@@ -19,13 +19,14 @@ func changelogTopicName(groupID, storageName string) string {
 
 // TableConfig is a structure for configuring table.
 type TableConfig struct {
-	Brokers string
-	GroupID string
-	Topic   string
-	DB      *rocksdb.DB
-	Context context.Context
-	Logger  *log.Logger
-	Name    string
+	Brokers  string
+	GroupID  string
+	Consumer *k.Consumer
+	Topic    string
+	DB       *rocksdb.DB
+	Context  context.Context
+	Logger   *log.Logger
+	Name     string
 }
 
 // Table is a primitive for working with distributed tables.
@@ -124,29 +125,19 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		return nil, err
 	}
 
-	// consumer
-	consumer, err := k.NewConsumer(&k.ConfigMap{
-		"bootstrap.servers":  config.Brokers,
-		"group.id":           config.GroupID,
-		"enable.auto.commit": false,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	// Subscribe to the main topic
 	rl := &rebalanceListener{
 		changelogTopicName: changelogTopicName,
 		log:                logWrapper,
 	}
 
-	consumer.SubscribeTopics([]string{config.Topic, changelogTopicName}, func(c *k.Consumer, e k.Event) error {
+	config.Consumer.SubscribeTopics([]string{config.Topic, changelogTopicName}, func(c *k.Consumer, e k.Event) error {
 		return rl.rebalance(c, e)
 	})
 
 	// Construct table
 	t = &Table{
-		consumer:           consumer,
+		consumer:           config.Consumer,
 		producer:           producer,
 		config:             config,
 		db:                 db,
