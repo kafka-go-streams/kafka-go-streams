@@ -27,6 +27,7 @@ func NewRoutingConsumer(consumer *k.Consumer) *RoutingConsumer {
 func (c *RoutingConsumer) run() {
 	for {
 		e := c.consumer.Poll(2000)
+
 		switch v := e.(type) {
 		case *k.Message:
 			topic := *v.TopicPartition.Topic
@@ -82,6 +83,10 @@ func (c *RoutingConsumer) ResetOffsets(offsets []Offset) error {
 		}
 	}
 	return c.consumer.Assign(ps)
+}
+
+func (c *RoutingConsumer) CommitMessage(v *k.Message) ([]k.TopicPartition, error) {
+	return c.consumer.CommitMessage(v)
 }
 
 type Offset struct {

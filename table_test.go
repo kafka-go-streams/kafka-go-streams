@@ -22,6 +22,7 @@ func TestNewTable(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to construct consumer: %v", err)
 	}
+	routingConsumer := NewRoutingConsumer(consumer)
 
 	log := &log.Logger{
 		Out:       os.Stderr,
@@ -36,7 +37,7 @@ func TestNewTable(t *testing.T) {
 	table, err := NewTable(&TableConfig{
 		Brokers:  brokers,
 		GroupID:  groupId,
-		Consumer: consumer,
+		Consumer: routingConsumer,
 		DB:       defaultRocksDB,
 		Topic:    "test_topic",
 		Context:  context.Background(),

@@ -21,7 +21,7 @@ func changelogTopicName(groupID, storageName string) string {
 type TableConfig struct {
 	Brokers  string
 	GroupID  string
-	Consumer *k.Consumer
+	Consumer *RoutingConsumer
 	Topic    string
 	DB       *rocksdb.DB
 	Context  context.Context
@@ -31,7 +31,7 @@ type TableConfig struct {
 
 // Table is a primitive for working with distributed tables.
 type Table struct {
-	consumer           *k.Consumer
+	consumer           *RoutingConsumer
 	producer           *k.Producer
 	config             *TableConfig
 	db                 *rocksdb.DB
@@ -40,6 +40,7 @@ type Table struct {
 	finished           chan struct{}
 	log                *LogWrapper
 	changelogTopicName string
+	subscription       *Subscription
 }
 
 type rebalanceListener struct {
@@ -47,18 +48,19 @@ type rebalanceListener struct {
 	log                *LogWrapper
 }
 
-func (l *rebalanceListener) rebalance(c *k.Consumer, e k.Event) error {
+func (l *rebalanceListener) rebalance(c *RoutingConsumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
 		l.log.Debugf("Recovering the partition from assignment: %v", v)
+		newOffsets := make([]Offset, 0)
 		for i := 0; i < len(v.Partitions); i++ {
 			if *v.Partitions[i].Topic == l.changelogTopicName {
 				l.log.Debugf("Setting offset to beginning")
-				v.Partitions[i].Offset = k.OffsetBeginning
+				newOffsets = append(newOffsets, Offset{int64(k.OffsetBeginning), *v.Partitions[i].Topic})
 			}
 		}
 		l.log.Debugf("Set offsets to new values: %v", v.Partitions)
-		err := c.Assign(v.Partitions)
+		err := c.ResetOffsets(newOffsets)
 		if err != nil {
 			l.log.Errorf("Failed to assign changelog partitions: %v", err)
 		}
@@ -131,9 +133,12 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		log:                logWrapper,
 	}
 
-	config.Consumer.SubscribeTopics([]string{config.Topic, changelogTopicName}, func(c *k.Consumer, e k.Event) error {
+	subscription, err := config.Consumer.Subscribe([]string{config.Topic, changelogTopicName}, func(c *RoutingConsumer, e k.Event) error {
 		return rl.rebalance(c, e)
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Construct table
 	t = &Table{
@@ -146,6 +151,7 @@ func NewTable(config *TableConfig) (t *Table, err error) {
 		finished:           make(chan struct{}),
 		log:                logWrapper,
 		changelogTopicName: changelogTopicName,
+		subscription:       subscription,
 	}
 
 	go t.consumeTopic()
@@ -168,7 +174,7 @@ loop:
 			break loop
 		default:
 		}
-		e := t.consumer.Poll(2000)
+		e := t.subscription.Poll()
 		switch v := e.(type) {
 		case *k.Message:
 			if *v.TopicPartition.Topic == t.changelogTopicName {
