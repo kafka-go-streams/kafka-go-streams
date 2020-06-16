@@ -84,8 +84,8 @@ func (c *RoutingConsumer) ResetOffsets(offsets []Offset) error {
 		}
 	}
 	log.Printf("Routing consumer: New assignment: %v", ps)
-	return nil
-	//return c.consumer.Assign(ps)
+	//return nil
+	return c.consumer.Assign(ps)
 }
 
 func (c *RoutingConsumer) CommitMessage(v *k.Message) ([]k.TopicPartition, error) {
@@ -100,6 +100,10 @@ type Offset struct {
 func (c *RoutingConsumer) rebalance(kc *k.Consumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
+		err := c.consumer.Assign(v.Partitions)
+		if err != nil {
+			return err
+		}
 		topics := make(map[string][]k.TopicPartition)
 		for _, p := range v.Partitions {
 			topics[*p.Topic] = append(topics[*p.Topic], p)

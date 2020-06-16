@@ -141,7 +141,7 @@ func TestTablePlusConsumer(t *testing.T) {
 			log.Printf("Received by consumer. Key: %s, Value: %s", v.Key, v.Value)
 			tableValue, err := table.Get(v.Key)
 			assert.Nil(t, err)
-			log.Printf("Table value: %s", tableValue)
+			log.Printf("Table value: %s", tableValue.Data())
 			_, err = rc.CommitMessage(v)
 			if err != nil {
 				log.Printf("Failed to commit message offset: %v", err)
