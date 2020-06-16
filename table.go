@@ -51,24 +51,24 @@ type rebalanceListener struct {
 func (l *rebalanceListener) rebalance(c *RoutingConsumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
-		l.log.Debugf("Recovering the partition from assignment: %v", v)
+		l.log.Debugf("Table: Recovering the partition from assignment: %v", v)
 		newOffsets := make([]Offset, 0)
 		for i := 0; i < len(v.Partitions); i++ {
 			if *v.Partitions[i].Topic == l.changelogTopicName {
-				l.log.Debugf("Setting offset to beginning")
+				l.log.Debugf("Table: Setting offset to beginning")
 				newOffsets = append(newOffsets, Offset{int64(k.OffsetBeginning), *v.Partitions[i].Topic})
 			}
 		}
-		l.log.Debugf("Set offsets to new values: %v", v.Partitions)
+		l.log.Debugf("Table: Set offsets to new values: %v", v.Partitions)
 		err := c.ResetOffsets(newOffsets)
 		if err != nil {
-			l.log.Errorf("Failed to assign changelog partitions: %v", err)
+			l.log.Errorf("Table: Failed to assign changelog partitions: %v", err)
 		}
-		l.log.Debugf("Successfully assigned partitions to changelog reader.")
+		l.log.Debugf("Table: Successfully assigned partitions to changelog reader.")
 	case k.RevokedPartitions:
-		l.log.Debugf("It was revoked partitions event: %v", v)
+		l.log.Debugf("Table: It was revoked partitions event: %v", v)
 	default:
-		l.log.Debugf("Unknown rebalance event: %v", e)
+		l.log.Debugf("Table: Unknown rebalance event: %v", e)
 	}
 	return nil
 }

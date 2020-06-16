@@ -77,12 +77,15 @@ func (c *RoutingConsumer) ResetOffsets(offsets []Offset) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("Routing consumer: Previous assignment: %v", ps)
 	for i := 0; i < len(ps); i++ {
 		if newOffset, ok := offsetMap[*ps[i].Topic]; ok {
 			ps[i].Offset = k.Offset(newOffset)
 		}
 	}
-	return c.consumer.Assign(ps)
+	log.Printf("Routing consumer: New assignment: %v", ps)
+	return nil
+	//return c.consumer.Assign(ps)
 }
 
 func (c *RoutingConsumer) CommitMessage(v *k.Message) ([]k.TopicPartition, error) {
@@ -101,10 +104,10 @@ func (c *RoutingConsumer) rebalance(kc *k.Consumer, e k.Event) error {
 		for _, p := range v.Partitions {
 			topics[*p.Topic] = append(topics[*p.Topic], p)
 		}
+		log.Printf("Received partitions in routing consumer: %v. Distributing them between subscribers.", v)
 		for t, p := range topics {
 			c.currentTopics[t].rebalanceListener(c, k.AssignedPartitions{p})
 		}
-		log.Printf("Received partitions in routing consumer: %v", v)
 	}
 	return nil
 }
