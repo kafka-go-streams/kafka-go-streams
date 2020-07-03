@@ -52,7 +52,7 @@ func (l *rebalanceListener) rebalance(c *RoutingConsumer, e k.Event) error {
 	switch v := e.(type) {
 	case k.AssignedPartitions:
 		l.log.Debugf("Table: Recovering the partition from assignment:")
-		printAssignedPartitions(v)
+		printPartitions(v.Partitions)
 		newOffsets := make([]Offset, 0)
 		for i := 0; i < len(v.Partitions); i++ {
 			if *v.Partitions[i].Topic == l.changelogTopicName {

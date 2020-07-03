@@ -97,8 +97,8 @@ type Offset struct {
 	Topic  string
 }
 
-func printAssignedPartitions(v k.AssignedPartitions) {
-	for _, p := range v.Partitions {
+func printPartitions(partitions []k.TopicPartition) {
+	for _, p := range partitions {
 		log.Printf("%v", p)
 	}
 }
@@ -115,7 +115,7 @@ func (c *RoutingConsumer) rebalance(kc *k.Consumer, e k.Event) error {
 			topics[*p.Topic] = append(topics[*p.Topic], p)
 		}
 		log.Printf("Received partitions in routing consumer:")
-		printAssignedPartitions(v)
+		printPartitions(v.Partitions)
 		log.Printf("Distributing them between subscribers.")
 		for t, p := range topics {
 			c.currentTopics[t].rebalanceListener(c, k.AssignedPartitions{p})

@@ -59,7 +59,7 @@ func TestMain(t *testing.T) {
 		log.Printf("Rebalancing event:")
 		switch v := e.(type) {
 		case k.AssignedPartitions:
-			printAssignedPartitions(v)
+			printPartitions(v.Partitions)
 		default:
 			log.Printf("%v", e)
 		}
