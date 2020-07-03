@@ -85,7 +85,8 @@ func TestTwoRoutingConsumers(t *testing.T) {
 }
 
 func TestTablePlusConsumer(t *testing.T) {
-	groupId := "rebalance_test_group_id_table"
+	//groupId := "rebalance_test_group_id_table"
+	groupId := "table_primer_group"
 	brokers := "localhost:9092"
 	consumer, err := k.NewConsumer(&k.ConfigMap{
 		"bootstrap.servers":  brokers,
@@ -121,6 +122,7 @@ func TestTablePlusConsumer(t *testing.T) {
 		Topic:    "test_topic",
 		Context:  context.Background(),
 		Logger:   log,
+		Name:     "test_name",
 	})
 
 	assert.Nil(t, err)
