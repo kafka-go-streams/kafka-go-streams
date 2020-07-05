@@ -60,7 +60,8 @@ func (l *rebalanceListener) rebalance(c *RoutingConsumer, e k.Event) error {
 				newOffsets = append(newOffsets, Offset{int64(k.OffsetBeginning), *v.Partitions[i].Topic})
 			}
 		}
-		l.log.Debugf("Table: Set offsets to new values: %v", v.Partitions)
+		l.log.Debugf("Table: Set offsets to new values:")
+		printPartitions(v.Partitions)
 		err := c.ResetOffsets(newOffsets)
 		if err != nil {
 			l.log.Errorf("Table: Failed to assign changelog partitions: %v", err)

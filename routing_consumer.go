@@ -77,13 +77,15 @@ func (c *RoutingConsumer) ResetOffsets(offsets []Offset) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Routing consumer: Previous assignment: %v", ps)
+	log.Printf("Routing consumer: Previous assignment:")
+	printPartitions(ps)
 	for i := 0; i < len(ps); i++ {
 		if newOffset, ok := offsetMap[*ps[i].Topic]; ok {
 			ps[i].Offset = k.Offset(newOffset)
 		}
 	}
-	log.Printf("Routing consumer: New assignment: %v", ps)
+	log.Printf("Routing consumer: New assignment:")
+	printPartitions(ps)
 	//return nil
 	return c.consumer.Assign(ps)
 }
