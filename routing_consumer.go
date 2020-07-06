@@ -8,7 +8,7 @@ import (
 )
 
 // RoutingConsumer allows you to have several processors that consume from
-// different topics, but use the feature of copartitioning topics.
+// different topics, but use the feature of copartitioned topics.
 type RoutingConsumer struct {
 	consumer      *k.Consumer
 	currentTopics map[string]*Subscription
