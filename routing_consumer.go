@@ -82,12 +82,16 @@ func (c *RoutingConsumer) ResetOffsets(offsets []Offset) error {
 	for i := 0; i < len(ps); i++ {
 		if newOffset, ok := offsetMap[*ps[i].Topic]; ok {
 			ps[i].Offset = k.Offset(newOffset)
+			err := c.consumer.Seek(ps[i], 0)
+			if err != nil {
+				log.Printf("Failed to Seek offset: %v", err)
+				return err
+			}
 		}
 	}
 	log.Printf("Routing consumer: New assignment:")
 	printPartitions(ps)
-	//return nil
-	return c.consumer.Assign(ps)
+	return nil
 }
 
 func (c *RoutingConsumer) CommitMessage(v *k.Message) ([]k.TopicPartition, error) {

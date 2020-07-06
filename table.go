@@ -56,7 +56,7 @@ func (l *rebalanceListener) rebalance(c *RoutingConsumer, e k.Event) error {
 		newOffsets := make([]Offset, 0)
 		for i := 0; i < len(v.Partitions); i++ {
 			if *v.Partitions[i].Topic == l.changelogTopicName {
-				l.log.Debugf("Table: Setting offset to beginning")
+				l.log.Debugf("Table: Topic: %v. Setting offset to beginning", *v.Partitions[i].Topic)
 				newOffsets = append(newOffsets, Offset{int64(k.OffsetBeginning), *v.Partitions[i].Topic})
 			}
 		}
