@@ -13,8 +13,6 @@ import (
 var storage_path = flag.String("storage", "storage", "Path to storage")
 
 func TestMain(t *testing.T) {
-	//flag.Parse()
-
 	rocksDB, err := DefaultRocksDB(*storage_path)
 
 	if err != nil {
