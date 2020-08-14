@@ -42,7 +42,7 @@ func TestMain(t *testing.T) {
 	table, err := NewTable(&TableConfig{
 		Brokers:  brokers,
 		GroupID:  groupId,
-		Topic:    "test_topic",
+		Topic:    "table_topic",
 		DB:       rocksDB,
 		Context:  context.Background(),
 		Logger:   logger,
